@@ -1,0 +1,31 @@
+# Pré-requisitos
+*.d
+
+# Arquivos compilados (Objetos)
+*.o
+*.ko
+*.obj
+*.elf
+
+# Arquivos executáveis (O que você NÃO quer subir)
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Pastas de Build (CMake)
+build/
+bin/
+out/
+
+# Arquivos de IDEs (VS Code e CLion)
+.vscode/
+.idea/
+cmake-build-debug/
+cmake-build-release/
+
+# Arquivos do Sistema Operacional (Lixo do Windows/Mac)
+.DS_Store
+Thumbs.db
