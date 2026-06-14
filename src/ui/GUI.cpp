@@ -370,9 +370,9 @@ bool GUI::screenToBoard(int x, int y, int& r, int& c) const {
 }
 
 sf::String GUI::pieceStr(const Piece& p) const {
-    static const wchar_t wh[] = {L'♔', L'♕', L'♖', L'♗', L'♘', L'♙'};
-    static const wchar_t bl[] = {L'♚', L'♛', L'♜', L'♝', L'♞', L'♟'};
-    const wchar_t* arr = (p.color == Color::WHITE) ? wh : bl;
+    static const char32_t wh[] = {U'♔', U'♕', U'♖', U'♗', U'♘', U'♙'};
+    static const char32_t bl[] = {U'♚', U'♛', U'♜', U'♝', U'♞', U'♟'};
+    const char32_t* arr = (p.color == Color::WHITE) ? wh : bl;
     int idx = 0;
     switch (p.type) {
         case PieceType::KING:   idx = 0; break;
@@ -381,9 +381,9 @@ sf::String GUI::pieceStr(const Piece& p) const {
         case PieceType::BISHOP: idx = 3; break;
         case PieceType::KNIGHT: idx = 4; break;
         case PieceType::PAWN:   idx = 5; break;
-        default: return L" ";
+        default: { char32_t sp = U' '; return sf::String::fromUtf32(&sp, &sp + 1); }
     }
-    return sf::String(std::wstring(1, arr[idx]));
+    return sf::String::fromUtf32(&arr[idx], &arr[idx] + 1);
 }
 
 void GUI::drawText(const sf::String& s, float x, float y, unsigned sz, sf::Color col) {
