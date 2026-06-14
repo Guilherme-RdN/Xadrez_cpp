@@ -16,13 +16,15 @@ set(ENGINE_SOURCES
     src/ai/Evaluator.cpp
     src/ai/MinimaxAI.cpp
     src/ai/AIFactory.cpp
-    src/ui/CLI.cpp
 )
 
-add_executable(xadrez ${ENGINE_SOURCES} src/main.cpp)
-target_include_directories(xadrez PRIVATE include)
+find_package(SFML 3 COMPONENTS Graphics Window System REQUIRED)
 
-add_executable(tests ${ENGINE_SOURCES} tests/tests.cpp)
+add_executable(xadrez ${ENGINE_SOURCES} src/ui/GUI.cpp src/main.cpp)
+target_include_directories(xadrez PRIVATE include)
+target_link_libraries(xadrez PRIVATE SFML::Graphics SFML::Window SFML::System)
+
+add_executable(tests ${ENGINE_SOURCES} src/ui/CLI.cpp tests/tests.cpp)
 target_include_directories(tests PRIVATE include)
 
 enable_testing()

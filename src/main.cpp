@@ -1,7 +1,7 @@
-#include "CLI.h"
+#include "GUI.h"
 
 int main() {
-    CLI cli;
-    cli.run();
+    GUI gui;
+    gui.run();
     return 0;
 }
