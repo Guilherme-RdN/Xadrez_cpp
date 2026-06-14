@@ -3,7 +3,17 @@
 Jogo de xadrez com interface gráfica em C++17.
 Adversário controlado por IA — algoritmo Minimax com poda Alpha-Beta.
 
-## Pré-requisitos
+## Só quero jogar (sem compilar)
+
+Baixe o `.zip` na aba **[Releases](../../releases)** do repositório, extraia e dê
+**duplo clique em `xadrez.exe`**. Não é preciso instalar nada — todas as bibliotecas já
+vão dentro do zip.
+
+As instruções abaixo são para quem quer **compilar o código a partir do fonte**.
+
+---
+
+## Pré-requisitos (para compilar)
 
 É necessário ter o **MSYS2** com o ambiente **UCRT64** e o **SFML 3**.
 
