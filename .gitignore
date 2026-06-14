@@ -7,6 +7,9 @@
 *.obj
 *.elf
 
+# Bibliotecas dinâmicas (copiadas para bin/ no build)
+*.dll
+
 # Arquivos executáveis (O que você NÃO quer subir)
 *.exe
 *.out

@@ -5,56 +5,35 @@ Adversário controlado por IA — algoritmo Minimax com poda Alpha-Beta.
 
 ## Pré-requisitos
 
-| Ferramenta | Versão mínima | Instalação |
-|---|---|---|
-| MSYS2 | qualquer | [msys2.org](https://www.msys2.org) |
-| g++ (MinGW-w64) | 12+ | via MSYS2 |
-| SFML | 3.x | via MSYS2 |
+É necessário ter o **MSYS2** com o ambiente **UCRT64** e o **SFML 3**.
 
-> **Importante:** todos os comandos abaixo devem ser executados no terminal **MSYS2 MinGW 64-bit**
-> (não o CMD ou PowerShell padrão do Windows).
-
----
-
-## Instalação (uma vez só)
-
-Abra o terminal **MSYS2 MinGW 64-bit** e execute:
+1. Instale o MSYS2: [msys2.org](https://www.msys2.org)
+2. Abra o terminal **MSYS2 UCRT64** e instale o compilador e o SFML:
 
 ```bash
-pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-sfml
+pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-sfml
 ```
+
+> **Importante:** o ambiente precisa ser o **UCRT64** (não o MINGW64). O compilador e o
+> SFML têm que ser do mesmo ambiente — misturar UCRT64 com MINGW64 causa erros de
+> runtime (tela branca, fechamento inesperado).
 
 ---
 
 ## Compilar
 
-No terminal **MSYS2 MinGW 64-bit**, dentro da pasta do projeto:
+No Windows, dê **duplo clique em `build.bat`** (ou rode `.\build.bat` no terminal).
 
-```bash
-g++ -std=c++17 -Iinclude -I"C:/msys64/mingw64/include" \
-    src/board/Board.cpp src/game/GameState.cpp \
-    src/ai/Evaluator.cpp src/ai/MinimaxAI.cpp src/ai/AIFactory.cpp \
-    src/ui/GUI.cpp src/main.cpp \
-    -L"C:/msys64/mingw64/lib" -lsfml-graphics -lsfml-window -lsfml-system \
-    -o xadrez.exe
-```
-
-Ou, no Windows (CMD/PowerShell), clique duas vezes em **`build.bat`**.
+O script compila o jogo em `bin\xadrez.exe` e copia automaticamente todas as
+bibliotecas (`.dll`) necessárias para a pasta `bin\`.
 
 ---
 
 ## Rodar
 
-**Opção 1 — mais simples:** clique duas vezes em **`run.bat`**
+Dê **duplo clique em `run.bat`**, ou abra diretamente `bin\xadrez.exe`.
 
-**Opção 2 — terminal MSYS2 MinGW 64-bit:**
-```bash
-./xadrez.exe
-```
-
-> **Por que não funciona com duplo clique direto no exe?**
-> O executável precisa das DLLs do SFML que ficam na pasta `C:\msys64\mingw64\bin`.
-> O `run.bat` configura esse caminho automaticamente.
+> Não é preciso ter o MSYS2 no PATH: as DLLs ficam dentro de `bin\`, ao lado do executável.
 
 ---
 
@@ -62,10 +41,10 @@ Ou, no Windows (CMD/PowerShell), clique duas vezes em **`build.bat`**.
 
 1. A janela abre no **menu** — escolha a dificuldade e a cor
 2. Clique em **JOGAR**
-3. Clique em uma peça para selecioná-la (casas válidas ficam destacadas em verde)
+3. Clique em uma peça para selecioná-la (as casas válidas ficam destacadas em verde)
 4. Clique na casa de destino para mover
 5. Quando um peão chega na última fileira, uma janela abre para escolher a promoção
-6. Para roque: mova o rei duas casas (ex.: `e1→g1` para roque pequeno das brancas)
+6. Para roque: mova o rei duas casas (ex.: rei de `e1` para `g1` = roque pequeno)
 
 ---
 
@@ -75,42 +54,45 @@ Ou, no Windows (CMD/PowerShell), clique duas vezes em **`build.bat`**.
 |---|---|---|
 | Fácil | 2 | Material (contagem de peças) |
 | Médio | 3 | Posicional (posição + centro) |
-| Difícil | 4 | Posicional (mais fundo) |
+| Difícil | 4 | Posicional (busca mais profunda) |
 
 ---
 
 ## Estrutura do projeto
 
 ```
-include/            headers públicos
-  Board.h           tabuleiro, Move, Piece, enums
-  GameState.h       xeque, xeque-mate, afogamento, movimentos legais
-  Evaluator.h       avaliadores + fábrica (Strategy pattern)
-  MinimaxAI.h       algoritmo Minimax com Alpha-Beta
-  AIFactory.h       criação de IA por dificuldade (Factory pattern)
-  GUI.h             interface gráfica SFML
+include/             headers públicos
+  Board.h            tabuleiro, Move, Piece, enums
+  GameState.h        xeque, xeque-mate, afogamento, movimentos legais
+  Evaluator.h        avaliadores + fábrica (Strategy pattern)
+  MinimaxAI.h        algoritmo Minimax com Alpha-Beta
+  AIFactory.h        criação de IA por dificuldade (Factory pattern)
+  GUI.h              interface gráfica (SFML)
 src/
-  board/Board.cpp   representação e geração de movimentos (roque, en passant, promoção)
-  game/GameState.cpp detecção de estados
-  ai/               motor de IA
-  ui/GUI.cpp        renderização e interação (mouse)
-  main.cpp          ponto de entrada
-tests/tests.cpp     25 testes unitários
-build.bat           script de compilação (Windows)
-run.bat             script de execução   (Windows)
+  board/Board.cpp    representação e geração de movimentos (roque, en passant, promoção)
+  game/GameState.cpp detecção de estados do jogo
+  ai/                motor de IA (avaliadores, Minimax, fábrica)
+  ui/GUI.cpp         renderização e interação por mouse
+  main.cpp           ponto de entrada
+tests/tests.cpp      25 testes unitários
+build.bat            compila o jogo e copia as DLLs para bin\
+run.bat              executa bin\xadrez.exe
+bin/                 saída do build (gerada por build.bat, não versionada)
 ```
 
-A documentação completa está em [DOCUMENTACAO.md](DOCUMENTACAO.md).
+A documentação completa do código está em [DOCUMENTACAO.md](DOCUMENTACAO.md).
 
 ---
 
-## Compilar e rodar os testes
+## Testes
+
+Os testes não dependem do SFML. No terminal **MSYS2 UCRT64**:
 
 ```bash
 g++ -std=c++17 -Iinclude \
     src/board/Board.cpp src/game/GameState.cpp \
     src/ai/Evaluator.cpp src/ai/MinimaxAI.cpp src/ai/AIFactory.cpp \
-    src/ui/CLI.cpp tests/tests.cpp -o tests.exe
+    tests/tests.cpp -o bin/tests.exe
 
-./tests.exe
+./bin/tests.exe
 ```

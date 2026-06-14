@@ -9,9 +9,10 @@ demonstra.
 
 ## 1. Visão geral
 
-O projeto é um jogo de xadrez jogável no terminal, em **C++17**, contra um adversário
-controlado por IA. A IA usa o algoritmo **Minimax com poda Alpha-Beta** — a mesma base
-conceitual de motores profissionais.
+O projeto é um jogo de xadrez com **interface gráfica**, em **C++17**, contra um adversário
+controlado por IA. A interface usa a biblioteca **SFML 3** e o jogo é todo conduzido pelo
+mouse. A IA usa o algoritmo **Minimax com poda Alpha-Beta** — a mesma base conceitual de
+motores profissionais.
 
 O sistema está dividido em módulos independentes, cada um com uma responsabilidade única:
 
@@ -22,7 +23,7 @@ O sistema está dividido em módulos independentes, cada um com uma responsabili
 | Avaliação | `Evaluator.h/.cpp` | Converter uma posição em um número (o "cérebro") |
 | Busca | `MinimaxAI.h/.cpp` | Minimax + Alpha-Beta: escolher o melhor lance |
 | Dificuldade | `AIFactory.h/.cpp` | Montar a IA conforme o nível escolhido |
-| Interface | `CLI.h/.cpp`, `main.cpp` | Menu, leitura de lances, laço da partida |
+| Interface | `GUI.h/.cpp`, `main.cpp` | Janela SFML, render do tabuleiro, interação por mouse |
 | Testes | `tests/tests.cpp` | Garantir que tudo funciona |
 
 ---
@@ -35,7 +36,7 @@ O sistema está dividido em módulos independentes, cada um com uma responsabili
 | Fase 2 — Movimentos | geração por peça + regras especiais | `Board::generatePseudoLegalMoves` e helpers |
 | Fase 3 — Estados | xeque / mate / afogamento | `GameState` |
 | Fase 4 — IA | Minimax + Alpha-Beta + avaliação | `MinimaxAI`, `Evaluator` |
-| Fase 5 — CLI/Integração | laço, fim de jogo, sair/reiniciar | `CLI`, `main.cpp` |
+| Fase 5 — Interface/Integração | menu, laço da partida, fim de jogo, reiniciar | `GUI`, `main.cpp` |
 
 Regras especiais pedidas como melhoria (roque, en passant, promoção) **estão todas
 implementadas**.
@@ -44,17 +45,22 @@ implementadas**.
 
 ## 3. Como compilar e jogar
 
-```bash
-cmake -S . -B build
-cmake --build build
-./build/xadrez      # jogo
-./build/tests       # testes
+O projeto depende do **SFML 3** instalado no ambiente **MSYS2 UCRT64** (ver `README.md`).
+A forma mais simples no Windows:
+
+```
+build.bat     # compila bin\xadrez.exe e copia as DLLs necessarias
+run.bat       # executa o jogo
 ```
 
-Sem CMake, há a linha `g++` equivalente no `README.md`.
+No jogo: a janela abre no menu — escolha a dificuldade e a cor e clique em **JOGAR**.
+Clique numa peça (as casas válidas ficam destacadas) e depois na casa de destino para
+mover. Na promoção, uma janela pede a peça. Roque é mover o rei duas casas.
 
-No jogo: escolha a dificuldade (1/2/3), a cor, e digite lances como `e2 e4`. Roque é
-mover o rei duas casas (`e1 g1`). `sair` encerra.
+> **Atenção ao ambiente.** O compilador (`g++`) e o SFML têm que ser do **mesmo** ambiente
+> MSYS2 (UCRT64). Misturar UCRT64 com MINGW64 gera dois runtimes C++ incompatíveis no mesmo
+> processo — o sintoma é a janela abrir branca e fechar sozinha (corrupção de heap). Por isso
+> o `build.bat` força o `PATH` do UCRT64 e copia as DLLs desse mesmo ambiente para `bin\`.
 
 ---
 
@@ -259,7 +265,8 @@ helper certo via um `switch` no tipo. As direções (`rookDirs`, `bishopDirs`, e
 ### 6.5 `printBoard` e `getPieceChar`
 
 Imprimem o tabuleiro com coordenadas `a–h` e `1–8`. Brancas em maiúsculas, pretas em
-minúsculas, `.` para casa vazia. É a função reaproveitada pela interface CLI.
+minúsculas, `.` para casa vazia. São herança da Fase 1 do DEV 1, úteis para depuração no
+terminal; a interface final é gráfica (ver seção 12).
 
 ---
 
@@ -524,26 +531,38 @@ pilha `history`. É o padrão *make/unmake* dos motores de xadrez de verdade.
 
 ---
 
-## 12. `CLI` e `main.cpp` — a interface (Fase 5)
+## 12. `GUI` e `main.cpp` — a interface gráfica (Fase 5)
 
-`CLI` **encapsula** uma partida: tem um `Board` e uma `MinimaxAI` (composição). Métodos
-privados quebram o problema em pedaços legíveis:
+A interface usa **SFML 3**. A classe `GUI` **encapsula** a partida inteira: tem um `Board`,
+um `std::unique_ptr<MinimaxAI>` e a `sf::RenderWindow` (composição). O estado da tela é um
+`enum class State { Menu, Playing, Promotion, GameOver }` — uma **máquina de estados**
+simples que decide o que desenhar e como tratar o clique a cada momento.
 
-- `chooseDifficulty` / `chooseColor`: o menu inicial.
-- `parseSquares`: converte `"e2 e4"` em coordenadas (`coluna = letra - 'a'`,
-  `linha = 8 - número`).
-- `askPromotion`: pergunta a peça quando um peão promove.
-- `squareName`: o inverso, para mostrar o lance da IA.
-- `playGame`: o **laço principal** — imprime o tabuleiro; se não há lance legal, anuncia
-  mate ou afogamento e termina; senão, lê o lance do humano (validando contra a lista legal
-  e tratando promoção) ou pede o lance à IA; aplica e repete.
-- `run`: roda partidas enquanto o jogador quiser (`askPlayAgain`).
+**O laço principal (`run`)** segue o ciclo clássico de toda aplicação gráfica:
 
-O casamento do lance digitado usa as coordenadas para achar o lance correspondente **na
-lista de legais** e aplica o objeto encontrado — que já carrega o `MoveType` certo. Assim
-o jogador digita um simples `e1 g1` e o sistema sabe que é roque.
+1. **Tratar eventos** — `while (window.pollEvent())` consome os eventos da fila. Em SFML 3,
+   `pollEvent` devolve `std::optional<sf::Event>` e os eventos são tipados: testamos com
+   `ev->is<sf::Event::Closed>()` e `ev->getIf<sf::Event::MouseButtonReleased>()`. O clique é
+   roteado conforme o `State` atual (`onMenuClick`, `onBoardClick`, etc.).
+2. **Atualizar** — se é a vez da IA (`board.sideToMove() != humanColor`), chama `aiTurn()`,
+   que pede o lance à `MinimaxAI` e o aplica.
+3. **Desenhar** — limpa a tela e desenha conforme o estado (tabuleiro, barra lateral,
+   pop-up de promoção ou de fim de jogo) e mostra com `window.display()`.
 
-`main.cpp` só cria a `CLI` e chama `run()` — ponto de entrada mínimo.
+**Interação por mouse (`onBoardClick`).** Ao clicar numa peça da sua cor, geramos os lances
+legais e guardamos só os que partem daquela casa em `highlights` — que viram os pontos
+verdes na tela. Ao clicar num destino destacado, achamos o `Move` correspondente **na lista
+de legais** e o aplicamos — como o objeto já carrega o `MoveType` certo, um clique de `e1`
+para `g1` é reconhecido como roque automaticamente. Se o lance é uma promoção, mudamos para
+o estado `Promotion`, que abre o pop-up com as quatro peças.
+
+**Conversão de coordenadas.** `screenToBoard` faz pixel → casa (`(x - BORDA) / TAMANHO`) e
+`boardToScreen` faz o inverso. As peças são desenhadas com os símbolos Unicode do xadrez
+(♔♕♖♗♘♙…) via `sf::String::fromUtf32` — usamos `char32_t` (UTF-32) de propósito, em vez de
+`std::wstring`, para não depender da conversão `codecvt` da biblioteca padrão, que varia
+entre versões de runtime e causava erro de carregamento de DLL.
+
+`main.cpp` só cria a `GUI` e chama `run()` — ponto de entrada mínimo.
 
 ---
 
@@ -554,7 +573,8 @@ iniciais, mate/afogamento, a IA achar e jogar lances legais, capturar peça pend
 evitar sacrifício ruim, a poda terminar em profundidade 4, polimorfismo do avaliador,
 a fábrica, **roque** (disponível, bloqueado e rejeitado por casa atacada), **en passant**
 (captura e `make`+`undo` idênticos) e **promoção** (4 opções, vira a peça certa), além das
-três dificuldades. Rodar `./build/tests` deve mostrar `25/25`.
+três dificuldades. Os testes não dependem do SFML (não usam a `GUI`); o comando para
+compilá-los está no `README.md`. A saída esperada é `25/25`.
 
 ---
 
@@ -565,8 +585,8 @@ três dificuldades. Rodar `./build/tests` deve mostrar `25/25`.
 | **Abstração** (classe base abstrata) | `Evaluator` com método virtual puro |
 | **Herança** | `Material/Positional/AggressiveEvaluator : public Evaluator` |
 | **Polimorfismo dinâmico** | `MinimaxAI` chama `evaluator->evaluate()` sem saber a filha |
-| **Encapsulamento** | membros `private` em `Board`, `MinimaxAI`, `CLI` |
-| **Composição** | `CLI` tem `Board`+`MinimaxAI`; `MinimaxAI` tem `Evaluator` |
+| **Encapsulamento** | membros `private` em `Board`, `MinimaxAI`, `GUI` |
+| **Composição** | `GUI` tem `Board`+`MinimaxAI`; `MinimaxAI` tem `Evaluator` |
 | **Destrutor virtual** | `virtual ~Evaluator() = default` |
 | **`override`** | nas três filhas de `Evaluator` |
 | **RAII / ponteiro inteligente** | `std::unique_ptr<Evaluator>` |
