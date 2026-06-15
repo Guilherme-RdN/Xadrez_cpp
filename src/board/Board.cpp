@@ -1,4 +1,5 @@
 #include "../../include/Board.h"
+#include <string>
 
 using namespace std;
 
@@ -23,6 +24,8 @@ Board::Board() {
         board[0][j] = {backRank[j], Color::BLACK};
         board[7][j] = {backRank[j], Color::WHITE};
     }
+
+    posHistory_.push_back(positionKey());
 }
 
 // Retorna 'true' se a casa não estiver vazia
@@ -98,10 +101,12 @@ void Board::makeMove(Move move) {
     if (move.toRow == 7 && move.toCol == 7) castleKingSide[static_cast<int>(Color::WHITE)] = false;
 
     sideToMove_ = opponent(sideToMove_);
+    posHistory_.push_back(positionKey());
 }
 
 void Board::undoMove(Move) {
     if (history.empty()) return;
+    if (!posHistory_.empty()) posHistory_.pop_back();
     Undo u = history.back();
     history.pop_back();
     Move m = u.move;
@@ -282,6 +287,45 @@ char Board::getPieceChar(Piece p) const {
     }
     // Maiúsculas para brancas, minúsculas para pretas
     return (p.color == Color::WHITE) ? toupper(c) : c;
+}
+
+std::string Board::positionKey() const {
+    std::string key;
+    key.reserve(70);
+    for (int r = 0; r < 8; r++)
+        for (int c = 0; c < 8; c++) {
+            const Piece& p = board[r][c];
+            if (p.isEmpty()) { key.push_back('.'); continue; }
+            char ch;
+            switch (p.type) {
+                case PieceType::PAWN:   ch = 'P'; break;
+                case PieceType::ROOK:   ch = 'R'; break;
+                case PieceType::KNIGHT: ch = 'N'; break;
+                case PieceType::BISHOP: ch = 'B'; break;
+                case PieceType::QUEEN:  ch = 'Q'; break;
+                case PieceType::KING:   ch = 'K'; break;
+                default:                ch = '.'; break;
+            }
+            if (p.color == Color::BLACK) ch = static_cast<char>(ch + 32);
+            key.push_back(ch);
+        }
+    key.push_back(sideToMove_ == Color::WHITE ? 'w' : 'b');
+    int wi = static_cast<int>(Color::WHITE), bi = static_cast<int>(Color::BLACK);
+    key.push_back(castleKingSide[wi]  ? 'K' : '-');
+    key.push_back(castleQueenSide[wi] ? 'Q' : '-');
+    key.push_back(castleKingSide[bi]  ? 'k' : '-');
+    key.push_back(castleQueenSide[bi] ? 'q' : '-');
+    key.push_back(epCol >= 0 ? static_cast<char>('a' + epCol) : '-');
+    return key;
+}
+
+int Board::countRepetitions() const {
+    if (posHistory_.empty()) return 0;
+    const std::string& cur = posHistory_.back();
+    int n = 0;
+    for (const std::string& k : posHistory_)
+        if (k == cur) ++n;
+    return n;
 }
 
 // Imprime o tabuleiro

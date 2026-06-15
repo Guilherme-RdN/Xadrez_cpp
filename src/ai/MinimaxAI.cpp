@@ -6,8 +6,8 @@
 static const int INF = 1000000;
 static const int MATE = 100000;
 
-MinimaxAI::MinimaxAI(int depth, std::unique_ptr<Evaluator> evaluator)
-    : depth_(depth), evaluator(std::move(evaluator)) {}
+MinimaxAI::MinimaxAI(int depth, std::unique_ptr<Evaluator> evaluator, bool avoidRepetitions)
+    : depth_(depth), evaluator(std::move(evaluator)), avoidRepetitions_(avoidRepetitions) {}
 
 int MinimaxAI::minimax(Board& board, int depth, int alpha, int beta, bool maximizing, Color rootSide) {
     nodes++;
@@ -69,6 +69,10 @@ Move MinimaxAI::chooseMove(Board& board, Color side, bool& found) {
     for (const Move& m : moves) {
         board.makeMove(m);
         int score = minimax(board, depth_ - 1, alpha, beta, false, side);
+        // No modo Facil, penaliza movimentos que levam a posicoes ja vistas
+        // (apareceram >= 1 vez antes) para evitar que a IA fique repetindo
+        if (avoidRepetitions_ && board.countRepetitions() >= 2)
+            score -= 200;
         board.undoMove(m);
         if (score > bestScore) {
             bestScore = score;

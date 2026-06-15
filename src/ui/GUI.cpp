@@ -2,15 +2,25 @@
 #include <algorithm>
 #include <string>
 
-static const sf::Color C_LIGHT  {240, 217, 181};
-static const sf::Color C_DARK   {181, 136,  99};
-static const sf::Color C_SEL    {247, 247, 105};
-static const sf::Color C_HINT   {106, 168,  79, 160};
-static const sf::Color C_CAP    {196,  64,  64, 180};
-static const sf::Color C_BG     { 22,  21,  18};
-static const sf::Color C_PANEL  { 38,  36,  33};
-static const sf::Color C_WHITE_P{255, 255, 240};
-static const sf::Color C_BLACK_P{ 28,  28,  28};
+static const sf::Color C_LIGHT    {240, 217, 181};
+static const sf::Color C_DARK     {181, 136,  99};
+static const sf::Color C_SEL      {247, 247, 105};
+static const sf::Color C_HINT     {106, 168,  79, 160};
+static const sf::Color C_CAP      {196,  64,  64, 180};
+static const sf::Color C_BG       { 22,  21,  18};
+static const sf::Color C_PANEL    { 38,  36,  33};
+static const sf::Color C_WHITE_P  {255, 255, 240};
+static const sf::Color C_BLACK_P  { 28,  28,  28};
+static const sf::Color C_LAST_MOVE{162, 213, 120};  // verde-oliva: origem e destino do lance da IA
+
+static void playMoveSound(bool capture) {
+#ifdef _WIN32
+    if (capture)
+        Beep(600, 45);
+    else
+        Beep(1100, 22);
+#endif
+}
 
 static std::string sqName(int r, int c) {
     return std::string(1, static_cast<char>('a' + c)) + std::to_string(8 - r);
@@ -76,8 +86,9 @@ void GUI::startGame() {
     selRow = selCol = -1;
     highlights.clear();
     lastAiMove.clear();
-    lastNodes  = 0;
+    lastNodes      = 0;
     gameResult.clear();
+    hasLastAiMove  = false;
     state = State::Playing;
 }
 
@@ -125,7 +136,11 @@ void GUI::drawBoard() {
     for (int r = 0; r < 8; r++) {
         for (int c = 0; c < 8; c++) {
             bool light = (r + c) % 2 == 0;
+            bool isLastAi = hasLastAiMove &&
+                            ((r == lastAiMoveObj.fromRow && c == lastAiMoveObj.fromCol) ||
+                             (r == lastAiMoveObj.toRow   && c == lastAiMoveObj.toCol));
             sf::Color sq = (r == selRow && c == selCol) ? C_SEL
+                         : isLastAi ? C_LAST_MOVE
                          : light ? C_LIGHT : C_DARK;
 
             auto pos = boardToScreen(r, c);
@@ -325,7 +340,9 @@ void GUI::onGameOverClick(int mx, int my) {
 }
 
 void GUI::applyMove(Move m) {
+    bool capture = !board.getPiece(m.toRow, m.toCol).isEmpty() || m.type == MoveType::EnPassant;
     board.makeMove(m);
+    playMoveSound(capture);
     selRow = selCol = -1;
     highlights.clear();
     checkEnd();
@@ -338,9 +355,13 @@ void GUI::aiTurn() {
     Color side = board.sideToMove();
     Move m = ai->chooseMove(board, side, found);
     if (found) {
-        lastAiMove = sqName(m.fromRow, m.fromCol) + "-" + sqName(m.toRow, m.toCol);
-        lastNodes  = ai->nodesVisited();
+        lastAiMove    = sqName(m.fromRow, m.fromCol) + "-" + sqName(m.toRow, m.toCol);
+        lastNodes     = ai->nodesVisited();
+        lastAiMoveObj = m;
+        hasLastAiMove = true;
+        bool capture  = !board.getPiece(m.toRow, m.toCol).isEmpty() || m.type == MoveType::EnPassant;
         board.makeMove(m);
+        playMoveSound(capture);
         checkEnd();
     }
 }

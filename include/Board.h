@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <string>
 #include <vector>
 
 // Enums para o tipo de peça e cor, conforme o roteiro
@@ -85,4 +86,11 @@ public:
     bool inBounds(int row, int col) const;
     bool findKing(Color color, int& row, int& col) const;
     std::vector<Move> generatePseudoLegalMoves(Color color) const;
+
+    // Rastreio de posicoes para repeticao
+    std::string positionKey() const;
+    int countRepetitions() const;
+
+private:
+    std::vector<std::string> posHistory_;
 };

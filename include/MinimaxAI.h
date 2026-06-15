@@ -5,7 +5,7 @@
 
 class MinimaxAI {
 public:
-    MinimaxAI(int depth, std::unique_ptr<Evaluator> evaluator);
+    MinimaxAI(int depth, std::unique_ptr<Evaluator> evaluator, bool avoidRepetitions = false);
 
     Move chooseMove(Board& board, Color side, bool& found);
     long nodesVisited() const { return nodes; }
@@ -16,6 +16,7 @@ private:
     int depth_;
     std::unique_ptr<Evaluator> evaluator;
     long nodes = 0;
+    bool avoidRepetitions_;
 
     int minimax(Board& board, int depth, int alpha, int beta, bool maximizing, Color rootSide);
 };

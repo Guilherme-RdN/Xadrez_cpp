@@ -3,7 +3,7 @@
 MinimaxAI AIFactory::create(Difficulty difficulty) {
     switch (difficulty) {
         case Difficulty::Easy:
-            return MinimaxAI(2, EvaluatorFactory::create(EvaluatorFactory::Strategy::Material));
+            return MinimaxAI(2, EvaluatorFactory::create(EvaluatorFactory::Strategy::Material), true);
         case Difficulty::Medium:
             return MinimaxAI(3, EvaluatorFactory::create(EvaluatorFactory::Strategy::Positional));
         case Difficulty::Hard:
