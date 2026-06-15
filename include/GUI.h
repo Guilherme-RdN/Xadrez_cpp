@@ -46,8 +46,10 @@ private:
     std::string       lastAiMove;
     long              lastNodes  = 0;
     std::string       gameResult;
-    Move              lastAiMoveObj{};   // fromRow = -1 quando nao ha lance anterior
+    Move              lastAiMoveObj{};
     bool              hasLastAiMove = false;
+    sf::Clock         aiDelayClock;
+    bool              aiDelayPending = false;  // aguarda 250ms apos lance humano antes de responder
 
     void startGame();
     void drawMenu();

@@ -52,8 +52,11 @@ void GUI::run() {
             }
         }
 
-        if (state == State::Playing && board.sideToMove() != humanColor)
-            aiTurn();
+        if (state == State::Playing && board.sideToMove() != humanColor) {
+            if (!aiDelayPending ||
+                aiDelayClock.getElapsedTime().asMilliseconds() >= 250)
+                aiTurn();
+        }
 
         window.clear(C_BG);
         switch (state) {
@@ -89,6 +92,7 @@ void GUI::startGame() {
     lastNodes      = 0;
     gameResult.clear();
     hasLastAiMove  = false;
+    aiDelayPending = false;
     state = State::Playing;
 }
 
@@ -345,6 +349,9 @@ void GUI::applyMove(Move m) {
     playMoveSound(capture);
     selRow = selCol = -1;
     highlights.clear();
+    // Inicia delay para a IA nao soar imediatamente apos o lance humano
+    aiDelayPending = true;
+    aiDelayClock.restart();
     checkEnd();
 }
 
@@ -355,11 +362,12 @@ void GUI::aiTurn() {
     Color side = board.sideToMove();
     Move m = ai->chooseMove(board, side, found);
     if (found) {
-        lastAiMove    = sqName(m.fromRow, m.fromCol) + "-" + sqName(m.toRow, m.toCol);
-        lastNodes     = ai->nodesVisited();
-        lastAiMoveObj = m;
-        hasLastAiMove = true;
-        bool capture  = !board.getPiece(m.toRow, m.toCol).isEmpty() || m.type == MoveType::EnPassant;
+        lastAiMove     = sqName(m.fromRow, m.fromCol) + "-" + sqName(m.toRow, m.toCol);
+        lastNodes      = ai->nodesVisited();
+        lastAiMoveObj  = m;
+        hasLastAiMove  = true;
+        aiDelayPending = false;
+        bool capture   = !board.getPiece(m.toRow, m.toCol).isEmpty() || m.type == MoveType::EnPassant;
         board.makeMove(m);
         playMoveSound(capture);
         checkEnd();
