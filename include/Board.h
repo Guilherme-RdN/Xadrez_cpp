@@ -87,10 +87,17 @@ public:
     bool findKing(Color color, int& row, int& col) const;
     std::vector<Move> generatePseudoLegalMoves(Color color) const;
 
-    // Rastreio de posicoes para repeticao
+    // Chave FIDE completa para regra da tripla repeticao oficial
     std::string positionKey() const;
     int countRepetitions() const;
 
+    // Chave simplificada (so pecas + lado) para heuristica anti-repeticao no Facil.
+    // Ignora direitos de roque/en passant para detectar vai-e-vem mesmo apos
+    // esses direitos terem sido perdidos.
+    std::string simplePositionKey() const;
+    int countSimpleRepetitions() const;
+
 private:
     std::vector<std::string> posHistory_;
+    std::vector<std::string> simplePosHistory_;
 };

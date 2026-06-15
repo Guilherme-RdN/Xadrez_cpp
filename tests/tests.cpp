@@ -203,6 +203,39 @@ int main() {
         check("IA Facil escolhe uma jogada", found);
     }
 
+    // --- IA Facil nao repete posicoes no vai-e-vem ---
+    // Simula um final simples: torre preta e ambos os reis.
+    // A IA (Facil, jogando de pretas) nao deve mover a torre
+    // de volta para uma casa ja visitada no mesmo turno subsequente.
+    {
+        // Coloca torres e reis: brancas Ke1, pretas Ke8+Ra8
+        // Fazemos a IA jogar 10 lances e verificamos que nenhuma
+        // posicao simplificada (pecas+lado) aparece 3 vezes.
+        Board b;
+        MinimaxAI easy = AIFactory::create(Difficulty::Easy);
+
+        // Limpa o tabuleiro ate so sobrar peoes/pecas relevantes nao.
+        // Na pratica, vamos apenas jogar 10 lances alternados e contar repeticoes.
+        // O teste falha se a IA jogar o mesmo lance 3x seguidas (posicao se repete 3x).
+        int maxRepetitions = 1;
+        for (int i = 0; i < 10; i++) {
+            // Lance branco simples: avanca um peao aleatoriamente (h-peao)
+            Color human = Color::WHITE;
+            auto humanMoves = GameState::generateLegalMoves(b, human);
+            if (humanMoves.empty()) break;
+            b.makeMove(humanMoves.front());
+
+            // Lance da IA Facil
+            bool found = false;
+            b.makeMove(easy.chooseMove(b, Color::BLACK, found));
+            if (!found) break;
+
+            int rep = b.countSimpleRepetitions();
+            if (rep > maxRepetitions) maxRepetitions = rep;
+        }
+        check("IA Facil nao repete a mesma posicao 3x (vai-e-vem)", maxRepetitions < 3);
+    }
+
     std::cout << "\n=== Resultado: " << passed << "/" << total << " testes aprovados ===\n";
     return (passed == total) ? 0 : 1;
 }

@@ -26,6 +26,7 @@ Board::Board() {
     }
 
     posHistory_.push_back(positionKey());
+    simplePosHistory_.push_back(simplePositionKey());
 }
 
 // Retorna 'true' se a casa não estiver vazia
@@ -102,11 +103,13 @@ void Board::makeMove(Move move) {
 
     sideToMove_ = opponent(sideToMove_);
     posHistory_.push_back(positionKey());
+    simplePosHistory_.push_back(simplePositionKey());
 }
 
 void Board::undoMove(Move) {
     if (history.empty()) return;
-    if (!posHistory_.empty()) posHistory_.pop_back();
+    if (!posHistory_.empty())       posHistory_.pop_back();
+    if (!simplePosHistory_.empty()) simplePosHistory_.pop_back();
     Undo u = history.back();
     history.pop_back();
     Move m = u.move;
@@ -324,6 +327,42 @@ int Board::countRepetitions() const {
     const std::string& cur = posHistory_.back();
     int n = 0;
     for (const std::string& k : posHistory_)
+        if (k == cur) ++n;
+    return n;
+}
+
+// Chave simplificada: apenas 64 casas + lado a mover.
+// Ignora direitos de roque e en passant para que o vai-e-vem seja
+// detectado mesmo depois que esses direitos foram perdidos.
+std::string Board::simplePositionKey() const {
+    std::string key;
+    key.reserve(65);
+    for (int r = 0; r < 8; r++)
+        for (int c = 0; c < 8; c++) {
+            const Piece& p = board[r][c];
+            if (p.isEmpty()) { key.push_back('.'); continue; }
+            char ch;
+            switch (p.type) {
+                case PieceType::PAWN:   ch = 'P'; break;
+                case PieceType::ROOK:   ch = 'R'; break;
+                case PieceType::KNIGHT: ch = 'N'; break;
+                case PieceType::BISHOP: ch = 'B'; break;
+                case PieceType::QUEEN:  ch = 'Q'; break;
+                case PieceType::KING:   ch = 'K'; break;
+                default:                ch = '.'; break;
+            }
+            if (p.color == Color::BLACK) ch = static_cast<char>(ch + 32);
+            key.push_back(ch);
+        }
+    key.push_back(sideToMove_ == Color::WHITE ? 'w' : 'b');
+    return key;
+}
+
+int Board::countSimpleRepetitions() const {
+    if (simplePosHistory_.empty()) return 0;
+    const std::string& cur = simplePosHistory_.back();
+    int n = 0;
+    for (const std::string& k : simplePosHistory_)
         if (k == cur) ++n;
     return n;
 }

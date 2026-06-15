@@ -66,13 +66,24 @@ Move MinimaxAI::chooseMove(Board& board, Color side, bool& found) {
     int alpha = -INF;
     int beta = INF;
 
+    // Modo Facil: filtra lancamentos que revisitam posicoes ja vistas
+    // (chave simplificada: so pecas + lado, sem roque/en passant).
+    // Isso impede vai-e-vem mesmo quando os direitos de roque mudaram.
+    // O filtro so remove; se todos os lancamentos forem repeticao, mantemos todos.
+    if (avoidRepetitions_) {
+        std::vector<Move> fresh;
+        for (const Move& m : moves) {
+            board.makeMove(m);
+            bool repeated = board.countSimpleRepetitions() >= 2;
+            board.undoMove(m);
+            if (!repeated) fresh.push_back(m);
+        }
+        if (!fresh.empty()) moves = fresh;
+    }
+
     for (const Move& m : moves) {
         board.makeMove(m);
         int score = minimax(board, depth_ - 1, alpha, beta, false, side);
-        // No modo Facil, penaliza movimentos que levam a posicoes ja vistas
-        // (apareceram >= 1 vez antes) para evitar que a IA fique repetindo
-        if (avoidRepetitions_ && board.countRepetitions() >= 2)
-            score -= 200;
         board.undoMove(m);
         if (score > bestScore) {
             bestScore = score;
