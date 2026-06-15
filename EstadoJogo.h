@@ -15,6 +15,11 @@ public:
     static std::vector<Jogada> gerarJogadasLegais(Tabuleiro& tab, Cor lado);
     static bool eXequeMate(Tabuleiro& tab, Cor lado);
     static bool eAfogamento(Tabuleiro& tab, Cor lado);
+
+    // Empates
+    static bool eEmpatePorRepeticao(const Tabuleiro& tab);
+    static bool eEmpatePorRegra50Lances(const Tabuleiro& tab);
+    static bool eMaterialInsuficiente(const Tabuleiro& tab);
 };
 
 } // namespace xadrez
