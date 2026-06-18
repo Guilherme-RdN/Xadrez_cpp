@@ -190,11 +190,29 @@ Color sideToMove() const { return sideToMove_; }
 bool inBounds(int row, int col) const;
 bool findKing(Color color, int& row, int& col) const;
 std::vector<Move> generatePseudoLegalMoves(Color color) const;
+
+// Regra da tripla repetição (FIDE): chave com peças + vez + direitos de roque + ep
+std::string positionKey() const;
+int countRepetitions() const;
+
+// Heurística anti-repetição no Fácil: chave só com peças + vez (sem roque/ep)
+std::string simplePositionKey() const;
+int countSimpleRepetitions() const;
 ```
 
 `sideToMove()` é um *getter* `const`: dá acesso de leitura sem expor o membro. `findKing`
 devolve a posição do rei por **referência** (`int&`) e retorna `bool` indicando se achou —
 um padrão clássico em C++ para "devolver dois valores".
+
+**Por que duas chaves de posição?** A regra oficial da FIDE (tripla repetição) exige que
+os direitos de roque e a casa de en passant façam parte da chave — duas posições visualmente
+idênticas mas com direitos diferentes *não* são a mesma posição para fins de regra. Já para
+a heurística de jogabilidade no Fácil (evitar o vai-e-vem chato), esses detalhes atrapalham:
+depois que o rei move e perde o direito de roque, a chave completa nunca mais bate e o
+vai-e-vem não é detectado. A chave simplificada (64 casas + vez, ~65 bytes) resolve isso —
+ela captura "parece a mesma posição para o jogador". Os dois históricos (`posHistory_` e
+`simplePosHistory_`) são mantidos em paralelo, empurrados em `makeMove` e estourados em
+`undoMove`.
 
 ---
 
@@ -225,6 +243,8 @@ Esta é a versão completa do método (o esqueleto original só movia a peça). 
    da casa de origem, perde aquele lado; se uma torre foi capturada no canto, o dono perde
    aquele lado.
 8. **Troca a vez** com `opponent`.
+9. **Registra no histórico de posições:** empurra `positionKey()` e `simplePositionKey()`
+   nos vetores `posHistory_` e `simplePosHistory_`, usados para detectar repetições.
 
 ### 6.3 `undoMove` — desfazer
 
@@ -236,6 +256,8 @@ Faz exatamente o inverso, usando o topo da pilha `history`:
    volta para o lado; nos demais, o capturado volta ao destino.
 4. Se foi roque, devolve a torre.
 5. Restaura direitos de roque, en passant e a vez a partir do `Undo`.
+6. **Remove do histórico:** estoura o último elemento de `posHistory_` e `simplePosHistory_`,
+   mantendo os vetores sincronizados com a pilha de desfazer.
 
 > O parâmetro `Move` é mantido por compatibilidade com a assinatura original do projeto,
 > mas a fonte da verdade é a pilha — assim o desfazer funciona mesmo para lances especiais,
@@ -412,7 +434,7 @@ recebe um `Evaluator`. Isso é o padrão **Factory** + **Strategy** trabalhando 
 ```cpp
 class MinimaxAI {
 public:
-    MinimaxAI(int depth, std::unique_ptr<Evaluator> evaluator);
+    MinimaxAI(int depth, std::unique_ptr<Evaluator> evaluator, bool avoidRepetitions = false);
     Move chooseMove(Board& board, Color side, bool& found);
     long nodesVisited() const { return nodes; }
     int depth() const { return depth_; }
@@ -420,6 +442,7 @@ public:
 private:
     int depth_;
     std::unique_ptr<Evaluator> evaluator;
+    bool avoidRepetitions_;
     long nodes = 0;
     int minimax(Board&, int depth, int alpha, int beta, bool maximizing, Color rootSide);
 };
@@ -430,13 +453,14 @@ Recebe a estratégia pela base — ela nunca sabe qual filha está usando, só c
 `evaluate()`. Isso é **polimorfismo dinâmico** de verdade.
 
 ```cpp
-MinimaxAI::MinimaxAI(int depth, std::unique_ptr<Evaluator> evaluator)
-    : depth_(depth), evaluator(std::move(evaluator)) {}
+MinimaxAI::MinimaxAI(int depth, std::unique_ptr<Evaluator> evaluator, bool avoidRepetitions)
+    : depth_(depth), evaluator(std::move(evaluator)), avoidRepetitions_(avoidRepetitions) {}
 ```
 
 O `std::move` transfere a posse do ponteiro (não copia — `unique_ptr` não é copiável). Como
 a classe tem um membro só-movível, a própria `MinimaxAI` vira **só-movível**, o que é usado
-pela fábrica de dificuldade (seção 10).
+pela fábrica de dificuldade (seção 10). O parâmetro `avoidRepetitions` é `false` por padrão;
+apenas o modo Fácil passa `true`.
 
 ### 9.2 `minimax` — recursão com Alpha-Beta
 
@@ -487,6 +511,29 @@ No nível raiz, percorre os lances legais, chama `minimax` para o adversário em
 guarda o de maior score. Devolve por referência (`bool& found`) se havia jogada — `false`
 significa mate/afogamento.
 
+Quando `avoidRepetitions_` é verdadeiro (modo Fácil), aplica um **pré-filtro** antes do
+Minimax:
+
+```cpp
+if (avoidRepetitions_) {
+    std::vector<Move> fresh;
+    for (const Move& m : moves) {
+        board.makeMove(m);
+        bool repeated = board.countSimpleRepetitions() >= 2;
+        board.undoMove(m);
+        if (!repeated) fresh.push_back(m);
+    }
+    if (!fresh.empty()) moves = fresh;
+}
+```
+
+Cada lance candidato é aplicado e desfeito; se a posição resultante já apareceu duas vezes
+no histórico simplificado, o lance é descartado. O Minimax roda só sobre o subconjunto
+restante. Se *todos* fossem repetição (beco sem saída), a lista original é mantida. Por que
+pré-filtro e não penalidade no score? Porque penalidade interagiria imprevisívelmente com a
+poda Alpha-Beta — um lance penalizado pode ser podado antes de ser comparado e a IA ainda
+escolheria o vai-e-vem. O filtro duro remove o problema antes da busca começar.
+
 ---
 
 ## 10. `AIFactory` — níveis de dificuldade
@@ -497,7 +544,7 @@ enum class Difficulty { Easy, Medium, Hard };
 MinimaxAI AIFactory::create(Difficulty difficulty) {
     switch (difficulty) {
         case Difficulty::Easy:
-            return MinimaxAI(2, EvaluatorFactory::create(Strategy::Material));
+            return MinimaxAI(2, EvaluatorFactory::create(Strategy::Material), true);
         case Difficulty::Medium:
             return MinimaxAI(3, EvaluatorFactory::create(Strategy::Positional));
         case Difficulty::Hard:
@@ -506,13 +553,17 @@ MinimaxAI AIFactory::create(Difficulty difficulty) {
 }
 ```
 
-Cada nível muda **dois** parâmetros reais da IA:
+Cada nível muda parâmetros reais da IA:
 
-| Nível | Profundidade | Avaliador |
-|---|---|---|
-| Fácil | 2 | Material (ingênuo) |
-| Médio | 3 | Posicional |
-| Difícil | 4 | Posicional |
+| Nível | Profundidade | Avaliador | Evita repetições |
+|---|---|---|---|
+| Fácil | 2 | Material (ingênuo) | Sim |
+| Médio | 3 | Posicional | Não |
+| Difícil | 4 | Posicional | Não |
+
+O terceiro parâmetro `true` no Fácil ativa o pré-filtro anti-repetição (seção 9.3). Médio e
+Difícil não precisam: seu avaliador posicional já gera natureza mais variada de lances e a
+repetição seria uma falha de avaliação, não uma característica do modo.
 
 Profundidade maior = a IA "enxerga" mais lances à frente; avaliador melhor = ela julga
 melhor cada posição. A fábrica devolve a `MinimaxAI` **por valor** — possível porque a
@@ -544,10 +595,23 @@ simples que decide o que desenhar e como tratar o clique a cada momento.
    `pollEvent` devolve `std::optional<sf::Event>` e os eventos são tipados: testamos com
    `ev->is<sf::Event::Closed>()` e `ev->getIf<sf::Event::MouseButtonReleased>()`. O clique é
    roteado conforme o `State` atual (`onMenuClick`, `onBoardClick`, etc.).
-2. **Atualizar** — se é a vez da IA (`board.sideToMove() != humanColor`), chama `aiTurn()`,
-   que pede o lance à `MinimaxAI` e o aplica.
+2. **Atualizar** — se é a vez da IA, **e se o delay de 250 ms já passou**, chama `aiTurn()`.
+   O delay é medido com `sf::Clock aiDelayClock` (reiniciado quando o humano move) e evita
+   que o som do lance do humano e o som da IA se sobreponham.
 3. **Desenhar** — limpa a tela e desenha conforme o estado (tabuleiro, barra lateral,
    pop-up de promoção ou de fim de jogo) e mostra com `window.display()`.
+
+**Destaque do último lance da IA.** Os membros `Move lastAiMoveObj` e `bool hasLastAiMove`
+guardam o último lance feito pela IA. Em `drawBoard()`, as casas de origem e destino desse
+lance são coloridas de verde-oliva (`{162, 213, 120}`) antes de desenhar os destaques de
+seleção do jogador. O resultado é que o jogador sempre vê de onde a IA moveu, mesmo que o
+lance tenha sido executado quase instantaneamente.
+
+**Som de movimentação.** A função `playMoveSound(bool capture)` usa a API `Beep()` do
+Windows — disponível sem DLL adicional — para emitir um beep curto: 1100 Hz por 22 ms para
+lances normais e 600 Hz por 45 ms para capturas. Como `Beep()` é síncrono e bloqueia a
+thread por sua duração, ele é chamado dentro do laço de jogo em momentos pontuais (em
+`applyMove` para o humano e em `aiTurn` para a IA), nunca em `drawBoard`.
 
 **Interação por mouse (`onBoardClick`).** Ao clicar numa peça da sua cor, geramos os lances
 legais e guardamos só os que partem daquela casa em `highlights` — que viram os pontos
@@ -568,13 +632,14 @@ entre versões de runtime e causava erro de carregamento de DLL.
 
 ## 13. `tests/tests.cpp`
 
-São 25 verificações automáticas cobrindo: ausência de xeque na abertura, as 20 jogadas
+São 26 verificações automáticas cobrindo: ausência de xeque na abertura, as 20 jogadas
 iniciais, mate/afogamento, a IA achar e jogar lances legais, capturar peça pendurada,
 evitar sacrifício ruim, a poda terminar em profundidade 4, polimorfismo do avaliador,
 a fábrica, **roque** (disponível, bloqueado e rejeitado por casa atacada), **en passant**
-(captura e `make`+`undo` idênticos) e **promoção** (4 opções, vira a peça certa), além das
-três dificuldades. Os testes não dependem do SFML (não usam a `GUI`); o comando para
-compilá-los está no `README.md`. A saída esperada é `25/25`.
+(captura e `make`+`undo` idênticos), **promoção** (4 opções, vira a peça certa), as três
+dificuldades e **anti-repetição do Fácil** (10 lances alternados, `countSimpleRepetitions`
+nunca atinge 3). Os testes não dependem do SFML (não usam a `GUI`); o comando para
+compilá-los está no `README.md`. A saída esperada é `26/26`.
 
 ---
 
